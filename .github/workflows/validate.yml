@@ -1,0 +1,31 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shell-and-compose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check shell syntax
+        run: |
+          bash -n install.sh
+          bash -n scripts/remote/bootstrap-user.sh
+          bash -n scripts/remote/install-server.sh
+          bash -n scripts/server/*.sh
+
+      - name: Render Compose template
+        run: |
+          tmp="$(mktemp -d)"
+          mkdir -p "$tmp/templates" "$tmp/scripts"
+          cp templates/docker-compose.yml.tpl "$tmp/templates/docker-compose.yml.tpl"
+          cp scripts/server/render-compose.sh "$tmp/scripts/render-compose.sh"
+          echo 2 > "$tmp/.worker-count"
+          BASE_DIR="$tmp" "$tmp/scripts/render-compose.sh"
+          cp .env.example "$tmp/.env"
+          cd "$tmp"
+          docker compose config >/dev/null
+
